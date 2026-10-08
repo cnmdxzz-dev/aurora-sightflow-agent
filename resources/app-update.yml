@@ -1,0 +1,3 @@
+provider: generic
+url: https://shiflowagent-auto-update.oss-cn-beijing.aliyuncs.com/app-updater/default
+updaterCacheDirName: shiflow-agent-updater

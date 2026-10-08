@@ -1,0 +1,32 @@
+# Electron运行文件
+*.exe
+*.dll
+*.pak
+*.bin
+
+# 大型缓存
+node_modules/
+
+# 日志
+*.log
+
+# 原始安装包
+*.rar
+*.zip
+
+# asar原包（可选）
+*.asar
+
+node_modules/
+dist/
+build/
+*.log
+
+*.dll
+*.exe
+*.pak
+*.bin
+
+.cache/
+temp/
+logs/
