@@ -78,11 +78,12 @@ function loadWebSocket() {
 }
 
 class AuroraTransport {
-  constructor({ bridge, gatewayUrl, identity = {}, heartbeatIntervalMs, reconnectBaseDelayMs, reconnectMaxDelayMs, actionExecutor } = {}) {
+  constructor({ bridge, gatewayUrl, identity = {}, heartbeatIntervalMs, reconnectBaseDelayMs, reconnectMaxDelayMs, actionExecutor, targetResolver } = {}) {
     if (!bridge) throw new TypeError("AuroraTransport requires the official Shell Bridge");
 
     this.bridge = bridge;
     this.actionExecutor = actionExecutor || new ActionExecutor({ bridge });
+    this.targetResolver = targetResolver || null;
     this.log = bridge.log || {
       info: (...args) => console.log(...args),
       warn: (...args) => console.warn(...args),
@@ -423,6 +424,10 @@ class AuroraTransport {
         device_id: this.deviceId,
         duplicate: persisted.duplicate
       });
+      if (message.payload?.type === "target_resolution") {
+        void this.handleTargetResolution(message, validation);
+        return;
+      }
       this.send(this.makeEnvelope("task.received", {
         accepted: true,
         task_id: validation.taskId,
@@ -443,6 +448,58 @@ class AuroraTransport {
         error: error?.message || String(error)
       });
       this.sendTaskRejected(failure);
+    }
+  }
+
+  sendTargetResolutionResult(validation, result) {
+    const payload = {
+      type: "target_resolution",
+      request_id: normalizeString(result?.request_id || validation.taskId),
+      ...(result && typeof result === "object" ? result : {
+        ok: false,
+        status: "unsupported",
+        error_code: "TARGET_RESOLVER_UNSUPPORTED",
+        message: "目标解析器不可用"
+      })
+    };
+    this.send(this.makeEnvelope("task.result", payload, validation.traceId, {
+      taskId: validation.taskId
+    }));
+  }
+
+  async handleTargetResolution(message, validation) {
+    const targetRequest = message.payload?.target_request;
+    if (!targetRequest || typeof targetRequest !== "object" || Array.isArray(targetRequest)) {
+      this.sendTargetResolutionResult(validation, {
+        request_id: validation.taskId,
+        ok: false,
+        status: "rejected",
+        error_code: "INVALID_TARGET_REQUEST",
+        message: "target_request 必须是对象"
+      });
+      return;
+    }
+    if (!this.targetResolver || typeof this.targetResolver.resolve !== "function") {
+      this.sendTargetResolutionResult(validation, {
+        request_id: targetRequest.request_id || validation.taskId,
+        ok: false,
+        status: "unsupported",
+        error_code: "TARGET_RESOLVER_UNSUPPORTED",
+        message: "目标解析器不可用"
+      });
+      return;
+    }
+    try {
+      const result = await this.targetResolver.resolve(targetRequest);
+      this.sendTargetResolutionResult(validation, result);
+    } catch (error) {
+      this.sendTargetResolutionResult(validation, {
+        request_id: targetRequest.request_id || validation.taskId,
+        ok: false,
+        status: "unsupported",
+        error_code: "TARGET_RESOLVER_UNSUPPORTED",
+        message: error?.message || String(error)
+      });
     }
   }
 
