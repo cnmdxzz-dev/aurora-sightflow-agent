@@ -35,6 +35,7 @@ const log = require("electron-log");
 const events = require("events");
 const os = require("os");
 const { AuroraTransport } = require("./aurora-transport");
+const { createProductionTargetResolver } = require("./resolver");
 function _interopNamespaceDefault(e) {
   const n = Object.create(null, { [Symbol.toStringTag]: { value: "Module" } });
   if (e) {
@@ -2087,7 +2088,8 @@ async function loadBiz() {
   loadedBiz = biz;
   console.log(`[BizLoader] Biz loaded successfully, version: ${biz.version}`);
   try {
-    auroraTransport = new AuroraTransport({ bridge });
+    const targetResolver = createProductionTargetResolver({ bridge });
+    auroraTransport = new AuroraTransport({ bridge, targetResolver });
     auroraTransport.start();
     console.log("[Aurora] Transport initialized", auroraTransport.getStatus());
   } catch (error) {
