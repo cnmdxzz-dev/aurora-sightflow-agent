@@ -5,12 +5,15 @@ const test = require("node:test");
 
 const {
   RESOLUTION_STATUS,
+  TARGET_SCHEMA_VERSION,
   TARGET_ERRORS
 } = require("../resources/app_source/out/main/target-contract");
 const { TargetResolver } = require("../resources/app_source/out/main/target-resolver");
 
 function request(overrides = {}) {
   return {
+    schema_version: TARGET_SCHEMA_VERSION,
+    request_id: "execution-1:target:action-1",
     execution_id: "exec-1",
     device_id: "device-1",
     plan_digest: "sha256:plan-1",
@@ -70,6 +73,7 @@ test("unique window and target resolve with evidence and plan digest", async () 
   assert.equal(result.ok, true);
   assert.equal(result.status, RESOLUTION_STATUS.RESOLVED);
   assert.equal(result.target_verified, true);
+  assert.equal(result.request_id, "execution-1:target:action-1");
   assert.equal(result.plan_digest, "sha256:plan-1");
   assert.equal(result.window.native_window_id, 100);
   assert.equal(result.target.bounds.width, 300);
@@ -144,4 +148,15 @@ test("invalid request is rejected before adapters are called", async () => {
   const result = await resolver.resolve({ device_id: "device-1" });
   assert.equal(result.error_code, TARGET_ERRORS.INVALID_TARGET_REQUEST);
   assert.equal(probeCalled, false);
+});
+
+test("target schema version is validated when provided", () => {
+  const { resolver } = makeResolver();
+  const invalid = resolver.resolve({
+    ...request(),
+    schema_version: "aurora.target/0.9"
+  });
+  return invalid.then((result) => {
+    assert.equal(result.error_code, TARGET_ERRORS.INVALID_TARGET_REQUEST);
+  });
 });

@@ -13,6 +13,11 @@ const RESOLUTION_STATUS = Object.freeze({
   NEED_HUMAN_CONFIRMATION: "need_human_confirmation"
 });
 
+// Internal target-resolution contract. This is separate from the aurora/1.0
+// transport envelope and is used only when Backend and the local resolver
+// exchange target metadata.
+const TARGET_SCHEMA_VERSION = "aurora.target/1.0";
+
 const TARGET_ERRORS = Object.freeze({
   INVALID_TARGET_REQUEST: "INVALID_TARGET_REQUEST",
   TARGET_NOT_FOUND: "TARGET_NOT_FOUND",
@@ -46,6 +51,13 @@ function normalizeTtl(value) {
 function validateTargetRequest(request) {
   const errors = [];
   if (!isPlainObject(request)) return { valid: false, errors: ["request must be an object"] };
+
+  if (request.schema_version !== undefined && request.schema_version !== TARGET_SCHEMA_VERSION) {
+    errors.push(`schema_version must be ${TARGET_SCHEMA_VERSION}`);
+  }
+  if (request.request_id !== undefined && !asNonEmptyString(request.request_id)) {
+    errors.push("request_id must be a non-empty string when provided");
+  }
 
   for (const field of ["execution_id", "device_id"]) {
     if (!asNonEmptyString(request[field])) errors.push(`${field} is required`);
@@ -116,6 +128,7 @@ function makeFailure({ request, status, errorCode, message, evidence = [] }) {
     status,
     error_code: errorCode,
     message,
+    request_id: request?.request_id || null,
     execution_id: request?.execution_id || null,
     device_id: request?.device_id || null,
     evidence: Object.freeze(Array.isArray(evidence) ? evidence.slice() : [])
@@ -127,6 +140,7 @@ module.exports = {
   MAX_TTL_MS,
   MIN_TTL_MS,
   RESOLUTION_STATUS,
+  TARGET_SCHEMA_VERSION,
   TARGET_ERRORS,
   isExpired,
   makeFailure,
